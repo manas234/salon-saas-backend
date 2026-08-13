@@ -359,7 +359,7 @@
             container.innerHTML = '<p class="col-span-full text-xs text-gray-400 text-center py-4">Loading slots...</p>';
 
             try {
-                const res = await fetch(`${API_URL}/slots?salon_id=${currentSalonId}&date=${date}`);
+                const res = await fetch(`${API_URL}/slots?salon=${salonSlug}&date=${date}`);
                 const slots = await res.json();
 
                 if (!res.ok || !slots || slots.length === 0) {

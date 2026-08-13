@@ -138,7 +138,9 @@
     </footer>
 
     <script>
-        const API_URL = "http://127.0.0.1:8000";
+        const API_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
+            ? "http://127.0.0.1:8000" 
+            : "https://salon-saas-backend-na9l.onrender.com";
         const urlParams = new URLSearchParams(window.location.search);
         const salonSlug = urlParams.get("salon");
 

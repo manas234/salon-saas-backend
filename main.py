@@ -9,10 +9,7 @@ import json
 from datetime import datetime
 import uuid
 
-# Line 11: Render ke environment se URL uthaye ga, agar nahi mila toh local sqlite use kare ga
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./salon.db")
-
-# Line 12: Agar sqlite hai toh connect_args use kare ga, warna khaali rahe ga (PostgreSQL ke liye)
 connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -47,7 +44,7 @@ class Appointment(Base):
     customer_email = Column(String, nullable=True)
     appointment_time = Column(String, nullable=False)
     status = Column(String, default="pending")
-    services_json = Column(String, nullable=True)  # <-- Added to store selected services
+    services_json = Column(String, nullable=True)
 
 try:
     with engine.connect() as conn:
@@ -140,11 +137,9 @@ def get_all_salons(db: Session = Depends(get_db)):
 @app.post("/salons")
 async def create_salon(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    
     existing = db.query(Salon).filter(Salon.slug == data.get("slug")).first()
     if existing:
         raise HTTPException(status_code=400, detail="Salon with this slug already exists")
-
     new_salon = Salon(
         id=str(uuid.uuid4()),
         name=data.get("name"),
@@ -199,7 +194,6 @@ async def create_service(request: Request, db: Session = Depends(get_db)):
     s_id = data["salon_id"]
     resolved_salon = find_salon_by_identifier(db, s_id)
     final_salon_id = resolved_salon.id if resolved_salon else s_id
-
     new_service = Service(
         id=str(uuid.uuid4()),
         salon_id=final_salon_id,
@@ -235,59 +229,40 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
 def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str = None, db: Session = Depends(get_db)):
     try:
         identifier = salon_id or salon or id or "gnstudio"
-        
-        if not date:
-            date = datetime.now().strftime("%Y-%m-%d")
+        if not date: date = datetime.now().strftime("%Y-%m-%d")
             
         resolved_salon = find_salon_by_identifier(db, identifier)
-        if not resolved_salon:
-            resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
-        if not resolved_salon:
-            return []
+        if not resolved_salon: resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
         
+        # Fallback values
+        open_hour = 9
+        close_hour = 19
+        if resolved_salon:
+            try: open_hour = int(resolved_salon.opening_time.split(":")[0])
+            except: pass
+            try: close_hour = int(resolved_salon.closing_time.split(":")[0])
+            except: pass
+        if close_hour <= open_hour: close_hour += 24
+
+        booked_apps = []
+        if resolved_salon:
+            booked_apps = db.query(Appointment).filter(
+                Appointment.salon_id == resolved_salon.id,
+                Appointment.appointment_time.like(f"{date}%")
+            ).all()
+        
+        booked_times = [app.appointment_time.split("T")[1][:5] for app in booked_apps if "T" in app.appointment_time]
         slots = []
-        open_hour = int(resolved_salon.opening_time.split(":")[0]) if resolved_salon.opening_time else 9
-        close_hour = int(resolved_salon.closing_time.split(":")[0]) if resolved_salon.closing_time else 19
-
-        if close_hour <= open_hour:
-            close_hour += 24
-
-        booked_appointments = db.query(Appointment).filter(
-            Appointment.salon_id == resolved_salon.id,
-            Appointment.appointment_time.like(f"{date}%")
-        ).all()
-        
-        booked_times = []
-        for app in booked_appointments:
-            if app.appointment_time and "T" in app.appointment_time:
-                try:
-                    booked_times.append(app.appointment_time.split("T")[1][:5])
-                except:
-                    pass
-
         now = datetime.now()
-        current_hour = now.hour
-        current_minute = now.minute
-
         for hour in range(open_hour, close_hour):
-            actual_hour = hour % 24
             for minute in (0, 30):
-                time_str = f"{actual_hour:02d}:{minute:02d}"
+                time_str = f"{hour%24:02d}:{minute:02d}"
                 is_booked = time_str in booked_times
-
                 if date == now.strftime("%Y-%m-%d"):
-                    if hour < current_hour or (hour == current_hour and current_minute > minute):
-                        is_booked = True
-
-                slots.append({
-                    "time": time_str,
-                    "is_booked": is_booked
-                })
-                
+                    if hour < now.hour or (hour == now.hour and now.minute > minute): is_booked = True
+                slots.append({"time": time_str, "is_booked": is_booked})
         return slots
-    except Exception as e:
-        print(f"Error in slots: {str(e)}")
-        return []
+    except: return []
 
 @app.get("/appointments")
 def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
@@ -297,38 +272,23 @@ def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
         target_id = resolved_salon.id if resolved_salon else salon_id
         query = query.filter(Appointment.salon_id == target_id)
     apps = query.all()
-    
     result = []
     for a in apps:
-        services_list = []
-        if a.services_json:
-            try:
-                services_list = json.loads(a.services_json)
-            except:
-                pass
-                
+        try: services = json.loads(a.services_json) if a.services_json else []
+        except: services = []
         result.append({
-            "id": a.id,
-            "salon_id": a.salon_id,
-            "customer_name": a.customer_name,
-            "customer_phone": a.customer_phone,
-            "customer_email": a.customer_email,
-            "appointment_time": a.appointment_time,
-            "status": a.status,
-            "services": services_list
+            "id": a.id, "salon_id": a.salon_id, "customer_name": a.customer_name,
+            "customer_phone": a.customer_phone, "customer_email": a.customer_email,
+            "appointment_time": a.appointment_time, "status": a.status, "services": services
         })
     return result
 
 @app.post("/appointments")
 async def create_appointment(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    
     s_id = data["salon_id"]
     resolved_salon = find_salon_by_identifier(db, s_id)
     final_salon_id = resolved_salon.id if resolved_salon else s_id
-    
-    services_data = data.get("services", [])
-    
     new_app = Appointment(
         id=str(uuid.uuid4()),
         salon_id=final_salon_id,
@@ -337,7 +297,7 @@ async def create_appointment(request: Request, db: Session = Depends(get_db)):
         customer_email=data.get("customer_email"),
         appointment_time=data["appointment_time"],
         status="pending",
-        services_json=json.dumps(services_data)
+        services_json=json.dumps(data.get("services", []))
     )
     db.add(new_app)
     db.commit()
@@ -347,8 +307,7 @@ async def create_appointment(request: Request, db: Session = Depends(get_db)):
 async def update_appointment_status(app_id: str, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     app = db.query(Appointment).filter(Appointment.id == app_id).first()
-    if not app:
-        raise HTTPException(status_code=404, detail="Appointment not found")
+    if not app: raise HTTPException(status_code=404, detail="Appointment not found")
     app.status = data.get("status", app.status)
     db.commit()
     return {"status": "success"}

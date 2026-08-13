@@ -337,6 +337,16 @@
             updateSummary();
         }
 
+        function removeService(id) {
+            const strId = String(id);
+            selectedServiceIds.delete(strId);
+            selectedServicesMap.delete(strId);
+            
+            // Re-render list & summary to untick the checkbox automatically
+            filterServices();
+            updateSummary();
+        }
+
         function updateSummary() {
             const t = translations[currentLang];
             const summaryEl = document.getElementById('selected-services-summary');
@@ -350,15 +360,20 @@
 
             let totalPrice = 0;
             let totalDuration = 0;
-            let names = [];
+            let badges = [];
 
-            selectedServicesMap.forEach(s => {
+            selectedServicesMap.forEach((s, id) => {
                 totalPrice += parseFloat(s.price) || 0;
                 totalDuration += parseInt(s.duration) || 0;
-                names.push(s.name);
+                badges.push(`
+                    <span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-1 rounded text-[10px] mr-1 inline-flex items-center gap-1.5 mb-1">
+                        ${s.name} 
+                        <button type="button" onclick="removeService('${id}')" class="text-indigo-400 hover:text-red-600 font-bold text-xs ml-0.5">×</button>
+                    </span>
+                `);
             });
 
-            summaryEl.innerHTML = names.map(n => `<span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded text-[10px] mr-1 inline-block mb-1">${n}</span>`).join('');
+            summaryEl.innerHTML = badges.join('');
             totalEl.innerText = `Total: €${totalPrice.toFixed(2)} | Duration: ${totalDuration} mins`;
         }
 

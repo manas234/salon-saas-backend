@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, text
+from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, text, cast
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
@@ -255,12 +255,17 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
 
         booked_apps = []
         if resolved_salon:
-            booked_apps = db.query(Appointment).filter(
-                Appointment.salon_id == resolved_salon.id,
-                Appointment.appointment_time.like(f"{date}%")
-            ).all()
+            # Safe query using Python filtering instead of SQL LIKE on timestamp
+            all_apps = db.query(Appointment).filter(Appointment.salon_id == resolved_salon.id).all()
+            booked_apps = [app for app in all_apps if app.appointment_time and str(app.appointment_time).startswith(date)]
         
-        booked_times = [app.appointment_time.split("T")[1][:5] for app in booked_apps if "T" in app.appointment_time]
+        booked_times = []
+        for app in booked_apps:
+            if "T" in str(app.appointment_time):
+                booked_times.append(str(app.appointment_time).split("T")[1][:5])
+            elif " " in str(app.appointment_time):
+                booked_times.append(str(app.appointment_time).split(" ")[1][:5])
+
         slots = []
         now = datetime.now()
         for hour in range(open_hour, close_hour):

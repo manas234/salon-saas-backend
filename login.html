@@ -96,25 +96,34 @@
             event.preventDefault();
             const t = translations[currentLang];
             const inputVal = document.getElementById('userInput').value.trim();
+            const enteredPassword = document.getElementById('password').value;
 
             try {
                 const salonRes = await fetch(`${API_URL}/salons`);
                 if (!salonRes.ok) throw new Error(t.errorServer);
                 const salons = await salonRes.json();
 
-                let targetSlug = inputVal;
+                let matchedSalon = null;
 
                 if (inputVal.includes('@')) {
-                    const matchedSalon = salons.find(s => s.owner_email === inputVal || s.email === inputVal);
-                    if (matchedSalon) {
-                        targetSlug = matchedSalon.slug;
-                    } else if (salons.length > 0) {
-                        targetSlug = salons[0].slug;
-                    }
+                    matchedSalon = salons.find(s => s.owner_email === inputVal || s.email === inputVal);
+                } else {
+                    matchedSalon = salons.find(s => s.slug === inputVal || s.id === inputVal);
+                }
+
+                if (!matchedSalon) {
+                    alert("Salon not found with this slug or email!");
+                    return;
+                }
+
+                const correctPassword = matchedSalon.admin_password || "admin123";
+                if (enteredPassword !== correctPassword) {
+                    alert("Incorrect password! Please try again.");
+                    return;
                 }
 
                 localStorage.setItem("admin_token", "test_bypass_token");
-                window.location.href = `admin.html?salon=${encodeURIComponent(targetSlug)}`;
+                window.location.href = `admin.html?salon=${encodeURIComponent(matchedSalon.slug)}`;
             } catch (err) {
                 alert(t.errorLogin + err.message);
             }

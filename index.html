@@ -277,10 +277,10 @@
                     });
                 });
 
-                filterServices();
-
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('appointment-date').value = today;
+
+                filterServices();
                 fetchTimeSlots();
 
             } catch (err) {
@@ -306,7 +306,7 @@
                 return `
                     <label class="flex items-center justify-between p-2.5 border rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer text-xs">
                         <div class="flex items-center gap-2.5">
-                            <input type="checkbox" value="${sIdStr}" ${isChecked} onchange="toggleService(this)" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <input type="checkbox" value="${sIdStr}" ${isChecked} onchange="toggleService(this, '${sIdStr}')" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span class="font-medium text-gray-800">${s.name} <span class="text-gray-400 text-[11px]">(${durationNum} mins)</span></span>
                         </div>
                         <span class="font-bold text-indigo-600">€${priceNum.toFixed(2)}</span>
@@ -321,8 +321,8 @@
             renderServices(filtered);
         }
 
-        function toggleService(checkbox) {
-            const strId = String(checkbox.value);
+        function toggleService(checkbox, id) {
+            const strId = String(id);
             const serviceObj = servicesDataMap.get(strId);
             
             if (!serviceObj) return;

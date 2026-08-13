@@ -232,25 +232,27 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 @app.get("/slots")
-def get_slots(salon_id: str = "gnstudio", date: str = None, db: Session = Depends(get_db)):
+def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str = None, db: Session = Depends(get_db)):
+    identifier = salon_id or salon or id or "gnstudio"
+    
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
         
-    salon = find_salon_by_identifier(db, salon_id)
-    if not salon:
-        salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
-    if not salon:
+    resolved_salon = find_salon_by_identifier(db, identifier)
+    if not resolved_salon:
+        resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
+    if not resolved_salon:
         return []
     
     slots = []
-    open_hour = int(salon.opening_time.split(":")[0]) if salon.opening_time else 9
-    close_hour = int(salon.closing_time.split(":")[0]) if salon.closing_time else 19
+    open_hour = int(resolved_salon.opening_time.split(":")[0]) if resolved_salon.opening_time else 9
+    close_hour = int(resolved_salon.closing_time.split(":")[0]) if resolved_salon.closing_time else 19
 
     if close_hour <= open_hour:
         close_hour += 24
 
     booked_appointments = db.query(Appointment).filter(
-        Appointment.salon_id == salon.id,
+        Appointment.salon_id == resolved_salon.id,
         Appointment.appointment_time.like(f"{date}%")
     ).all()
     booked_times = [app.appointment_time.split("T")[1][:5] for app in booked_appointments]

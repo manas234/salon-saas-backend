@@ -107,11 +107,11 @@ def serve_index():
 def serve_admin():
     return FileResponse("admin.html")
 
-@app.get("/superadmin.html")
+@app.get("/super-admin.html")
 def serve_superadmin():
-    if os.path.exists("superadmin.html"):
-        return FileResponse("superadmin.html")
-    return {"detail": "Superadmin file not found"}
+    if os.path.exists("super-admin.html"):
+        return FileResponse("super-admin.html")
+    return {"detail": "super-admin file not found"}
 
 @app.get("/salons")
 def get_all_salons(db: Session = Depends(get_db)):

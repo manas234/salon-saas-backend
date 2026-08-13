@@ -227,7 +227,7 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
 
 @app.get("/slots")
 def get_slots(salon_id: str, date: str, db: Session = Depends(get_db)):
-    salon = db.query(Salon).filter(Salon.id == salon_id).first()
+    salon = find_salon_by_identifier(db, salon_id)
     if not salon:
         return []
     
@@ -239,7 +239,7 @@ def get_slots(salon_id: str, date: str, db: Session = Depends(get_db)):
         close_hour += 24
 
     booked_appointments = db.query(Appointment).filter(
-        Appointment.salon_id == salon_id,
+        Appointment.salon_id == salon.id,
         Appointment.appointment_time.like(f"{date}%")
     ).all()
     booked_times = [app.appointment_time.split("T")[1][:5] for app in booked_appointments]
@@ -269,7 +269,10 @@ def get_slots(salon_id: str, date: str, db: Session = Depends(get_db)):
 def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
     query = db.query(Appointment)
     if salon_id:
-        query = query.filter(Appointment.salon_id == salon_id)
+        # Resolve salon_id in case a slug was passed
+        resolved_salon = find_salon_by_identifier(db, salon_id)
+        target_id = resolved_salon.id if resolved_salon else salon_id
+        query = query.filter(Appointment.salon_id == target_id)
     apps = query.all()
     
     result = []
@@ -297,11 +300,16 @@ def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
 async def create_appointment(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     
+    # Resolve salon_id in case a slug was passed instead of uuid
+    s_id = data["salon_id"]
+    resolved_salon = find_salon_by_identifier(db, s_id)
+    final_salon_id = resolved_salon.id if resolved_salon else s_id
+    
     services_data = data.get("services", [])
     
     new_app = Appointment(
         id=str(uuid.uuid4()),
-        salon_id=data["salon_id"],
+        salon_id=final_salon_id,
         customer_name=data["customer_name"],
         customer_phone=data["customer_phone"],
         customer_email=data.get("customer_email"),

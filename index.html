@@ -342,10 +342,19 @@
         }
 
         async function fetchTimeSlots() {
-            const date = document.getElementById('appointment-date').value;
+            let dateInput = document.getElementById('appointment-date').value;
             const container = document.getElementById('slots-container');
 
-            if (!date || !currentSalonId) return;
+            if (!dateInput || !currentSalonId) return;
+
+            // Safe formatting to ensure YYYY-MM-DD regardless of browser regional settings
+            let date = dateInput;
+            if (dateInput.includes('/')) {
+                const parts = dateInput.split('/');
+                if (parts.length === 3) {
+                    date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+            }
 
             container.innerHTML = '<p class="col-span-full text-xs text-gray-400 text-center py-4">Loading slots...</p>';
 
@@ -390,7 +399,16 @@
             const customer_name = document.getElementById('customer-name').value;
             const customer_phone = document.getElementById('customer-phone').value;
             const customer_email = document.getElementById('customer-email').value;
-            const date = document.getElementById('appointment-date').value;
+            let dateInput = document.getElementById('appointment-date').value;
+            
+            let date = dateInput;
+            if (dateInput.includes('/')) {
+                const parts = dateInput.split('/');
+                if (parts.length === 3) {
+                    date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+            }
+
             const appointment_time = `${date}T${selectedTimeSlot}:00`;
 
             const servicesList = [];

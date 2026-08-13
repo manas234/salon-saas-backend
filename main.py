@@ -8,8 +8,12 @@ import os
 import json
 from datetime import datetime
 
-DATABASE_URL = "sqlite:///./salon.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Line 11: Render ke environment se URL uthaye ga, agar nahi mila toh local sqlite use kare ga
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./salon.db")
+
+# Line 12: Agar sqlite hai toh connect_args use kare ga, warna khaali rahe ga (PostgreSQL ke liye)
+connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

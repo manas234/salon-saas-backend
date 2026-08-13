@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salon Owner Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+    
+    <div>
+        <!-- Top Header Bar -->
+        <header class="bg-indigo-600 text-white px-8 py-4 flex justify-between items-center shadow-md">
+            <div>
+                <h1 id="header-salon-name" class="text-xl font-bold">Salon Dashboard</h1>
+                <p id="txt-subtitle" class="text-indigo-100 text-xs mt-0.5">Manage business hours, services, and appointments</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Language Switcher -->
+                <select id="lang-select" onchange="changeLanguage(this.value)" class="bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-indigo-500 focus:outline-none cursor-pointer">
+                    <option value="en">English</option>
+                    <option value="it">Italiano</option>
+                </select>
+                <button onclick="logout()" id="btn-logout" class="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid Layout -->
+        <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column (Business Hours, Address & Existing Services) -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- Business Hours, Address & Status Card -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-4">
+                    <h2 id="lbl-hours-status" class="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                        🕒 Business Hours, Address & Status
+                    </h2>
+                    <form id="settings-form" onsubmit="updateSettings(event)" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label id="lbl-opening" class="block text-[11px] font-semibold text-gray-600 mb-1">Opening Time</label>
+                                <input type="time" id="opening-time" class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                            </div>
+                            <div>
+                                <label id="lbl-closing" class="block text-[11px] font-semibold text-gray-600 mb-1">Closing Time</label>
+                                <input type="time" id="closing-time" class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                            </div>
+                        </div>
+
+                        <!-- Salon Address Field -->
+                        <div>
+                            <label id="lbl-address" class="block text-[11px] font-semibold text-gray-600 mb-1">Salon Address</label>
+                            <input type="text" id="salon-address-input" placeholder="e.g. Via Roma 15, Verona, Italy" class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                        </div>
+
+                        <div>
+                            <label id="lbl-accepting" class="block text-[11px] font-semibold text-gray-600 mb-1">Accepting Bookings?</label>
+                            <select id="accepting-bookings" class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                                <option value="true" id="opt-open">Open (Accepting Bookings)</option>
+                                <option value="false" id="opt-closed">Closed (Paused Bookings)</option>
+                            </select>
+                        </div>
+                        <button type="submit" id="btn-update-settings" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow">Update Settings</button>
+                    </form>
+                </div>
+
+                <!-- Existing Services & Pricing Card -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-4">
+                    <h2 id="lbl-existing-services" class="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                        ✂️ Existing Services & Pricing
+                    </h2>
+                    <div id="services-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                        <!-- Dynamic Services List -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column (Add New Service & Appointments View) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- Add New Service Card -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-4">
+                    <h2 id="lbl-add-service-title" class="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                        ➕ Add New Service
+                    </h2>
+                    <form id="service-form" onsubmit="handleServiceSubmit(event)" class="space-y-4">
+                        <input type="hidden" id="edit-service-id">
+                        <div>
+                            <label id="lbl-service-name" class="block text-[11px] font-semibold text-gray-600 mb-1">Service Name</label>
+                            <input type="text" id="service-name" placeholder="e.g. Haircut & Beard" required class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label id="lbl-price" class="block text-[11px] font-semibold text-gray-600 mb-1">Price (€)</label>
+                                <input type="number" step="0.01" id="service-price" placeholder="25.00" required class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                            </div>
+                            <div>
+                                <label id="lbl-duration" class="block text-[11px] font-semibold text-gray-600 mb-1">Duration (Mins)</label>
+                                <input type="number" id="service-duration" placeholder="30" required class="w-full p-2 border rounded-xl text-xs bg-gray-50">
+                            </div>
+                        </div>
+                        <button type="submit" id="service-submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs shadow">Save Service</button>
+                    </form>
+                </div>
+
+                <!-- Appointments & Schedule View Card -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-4">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <h2 id="lbl-appointments-title" class="font-bold text-xs uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                            📅 Appointments & Schedule View
+                        </h2>
+                        <!-- Tabs Filter -->
+                        <div class="flex bg-gray-100 p-1 rounded-xl text-[11px] font-semibold">
+                            <button onclick="switchTab('upcoming')" id="tab-upcoming" class="px-2.5 py-1 rounded-lg text-gray-600">Upcoming</button>
+                            <button onclick="switchTab('today')" id="tab-today" class="px-2.5 py-1 rounded-lg bg-white shadow-sm text-indigo-600">Today</button>
+                            <button onclick="switchTab('weekly')" id="tab-weekly" class="px-2.5 py-1 rounded-lg text-gray-600">This Week</button>
+                            <button onclick="switchTab('monthly')" id="tab-monthly" class="px-2.5 py-1 rounded-lg text-gray-600">This Month</button>
+                            <button onclick="switchTab('past')" id="tab-past" class="px-2.5 py-1 rounded-lg text-gray-600">Past</button>
+                        </div>
+                    </div>
+
+                    <!-- Appointments Container -->
+                    <div id="appointments-container" class="space-y-3 min-h-[150px]">
+                        <p id="txt-loading-apps" class="text-xs text-gray-400 text-center py-8">Loading appointments...</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer id="txt-footer" class="py-4 text-center text-xs text-gray-400 border-t bg-white mt-10">
+        Salon Owner Control Panel
+    </footer>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        const urlParams = new URLSearchParams(window.location.search);
+        const salonSlug = urlParams.get("salon");
+
+        let currentSalonId = null;
+        let salonNameGlobal = "";
+        let globalServices = [];
+        let allAppointments = [];
+        let currentTab = 'today';
+        let currentLang = 'en';
+
+        const translations = {
+            en: {
+                subtitle: "Manage business hours, services, and appointments",
+                logout: "Logout",
+                hoursStatus: "🕒 Business Hours, Address & Status",
+                opening: "Opening Time",
+                closing: "Closing Time",
+                addressLabel: "Salon Address",
+                addressPlaceholder: "e.g. Via Roma 15, Verona, Italy",
+                accepting: "Accepting Bookings?",
+                open: "Open (Accepting Bookings)",
+                closed: "Closed (Paused Bookings)",
+                updateSettings: "Update Settings",
+                existingServices: "🕒 Existing Services & Pricing",
+                addServiceTitle: "➕ Add New Service",
+                serviceName: "Service Name",
+                price: "Price (€)",
+                duration: "Duration (Mins)",
+                saveService: "Save Service",
+                updateService: "Update Service",
+                appointmentsTitle: "📅 Appointments & Schedule View",
+                tabUpcoming: "Upcoming",
+                tabToday: "Today",
+                tabWeekly: "This Week",
+                tabMonthly: "This Month",
+                tabPast: "Past",
+                loadingApps: "Loading appointments...",
+                noApps: "No appointments found for this filter.",
+                noServices: "No services added yet.",
+                markServed: "✓ Mark Served",
+                delete: "Delete",
+                servicesBooked: "Booked Services",
+                footer: "Salon Owner Control Panel",
+                settingsUpdated: "Settings updated successfully!",
+                failedSettings: "Failed to update settings.",
+                deleteServiceConfirm: "Are you sure you want to delete this service?",
+                deleteAppConfirm: "Are you sure you want to delete this appointment?"
+            },
+            it: {
+                subtitle: "Gestisci orari di apertura, servizi e appuntamenti",
+                logout: "Esci",
+                hoursStatus: "🕒 Orari, Indirizzo e Stato",
+                opening: "Orario di Apertura",
+                closing: "Orario di Chiusura",
+                addressLabel: "Indirizzo Salone",
+                addressPlaceholder: "es. Via Roma 15, Verona, Italia",
+                accepting: "Accetta Prenotazioni?",
+                open: "Aperto (Accetta Prenotazioni)",
+                closed: "Chiuso (Prenotazioni Sospese)",
+                updateSettings: "Aggiorna Impostazioni",
+                existingServices: "🕒 Servizi Esistenti e Prezzi",
+                addServiceTitle: "➕ Aggiungi Nuovo Servizio",
+                serviceName: "Nome Servizio",
+                price: "Prezzo (€)",
+                duration: "Durata (Minuti)",
+                saveService: "Salva Servizio",
+                updateService: "Aggiorna Servizio",
+                appointmentsTitle: "📅 Visualizzazione Appuntamenti e Calendario",
+                tabUpcoming: "Prossimi",
+                tabToday: "Oggi",
+                tabWeekly: "Questa Settimana",
+                tabMonthly: "Questo Mese",
+                tabPast: "Passati",
+                loadingApps: "Caricamento appuntamenti...",
+                noApps: "Nessun appuntamento trovato per questo filtro.",
+                noServices: "Nessun servizio aggiunto.",
+                markServed: "✓ Segna come Servito",
+                delete: "Elimina",
+                servicesBooked: "Servizi Prenotati",
+                footer: "Pannello di Controllo Proprietario Salone",
+                settingsUpdated: "Impostazioni aggiornate con successo!",
+                failedSettings: "Aggiornamento impostazioni fallito.",
+                deleteServiceConfirm: "Sei sicuro di voler eliminare questo servizio?",
+                deleteAppConfirm: "Sei sicuro di voler eliminare questo appuntamento?"
+            }
+        };
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+
+            document.getElementById('txt-subtitle').innerText = t.subtitle;
+            document.getElementById('btn-logout').innerText = t.logout;
+            document.getElementById('lbl-hours-status').innerText = t.hoursStatus;
+            document.getElementById('lbl-opening').innerText = t.opening;
+            document.getElementById('lbl-closing').innerText = t.closing;
+            document.getElementById('lbl-address').innerText = t.addressLabel;
+            document.getElementById('salon-address-input').placeholder = t.addressPlaceholder;
+            document.getElementById('lbl-accepting').innerText = t.accepting;
+            document.getElementById('opt-open').innerText = t.open;
+            document.getElementById('opt-closed').innerText = t.closed;
+            document.getElementById('btn-update-settings').innerText = t.updateSettings;
+            document.getElementById('lbl-existing-services').innerText = t.existingServices;
+            document.getElementById('lbl-add-service-title').innerText = t.addServiceTitle;
+            document.getElementById('lbl-service-name').innerText = t.serviceName;
+            document.getElementById('lbl-price').innerText = t.price;
+            document.getElementById('lbl-duration').innerText = t.duration;
+            
+            const editId = document.getElementById('edit-service-id').value;
+            const submitBtn = document.getElementById('service-submit-btn');
+            submitBtn.innerText = editId ? t.updateService : t.saveService;
+
+            document.getElementById('lbl-appointments-title').innerText = t.appointmentsTitle;
+            document.getElementById('tab-upcoming').innerText = t.tabUpcoming;
+            document.getElementById('tab-today').innerText = t.tabToday;
+            document.getElementById('tab-weekly').innerText = t.tabWeekly;
+            document.getElementById('tab-monthly').innerText = t.tabMonthly;
+            document.getElementById('tab-past').innerText = t.tabPast;
+            document.getElementById('txt-footer').innerText = t.footer;
+
+            renderServices();
+            renderAppointments();
+        }
+
+        async function loadDashboard() {
+            if (!salonSlug) {
+                document.body.innerHTML = `<div class="p-8 text-center text-red-600 font-bold">Error: No salon specified in URL!</div>`;
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/salons/${salonSlug}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    document.body.innerHTML = `
+                        <div class="max-w-xl mx-auto bg-white rounded-xl shadow-md p-6 mt-20 text-center py-12">
+                            <div class="text-red-600 text-5xl mb-4">⚠️</div>
+                            <h2 class="text-xl font-bold text-gray-800 mb-2">Subscription Expired</h2>
+                            <p class="text-gray-600 text-sm mb-6">${data.detail || "Your subscription is expired."}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                currentSalonId = data.salon.id;
+                salonNameGlobal = data.salon.name;
+                document.getElementById('header-salon-name').innerText = `Salon Dashboard: ${salonNameGlobal}`;
+                
+                document.getElementById('opening-time').value = data.salon.opening_time || "09:00";
+                document.getElementById('closing-time').value = data.salon.closing_time || "19:00";
+                document.getElementById('salon-address-input').value = data.salon.address || "";
+                document.getElementById('accepting-bookings').value = String(data.salon.is_active ?? true);
+
+                globalServices = data.services;
+                renderServices();
+                loadAppointments();
+            } catch (err) {
+                console.error("Error loading dashboard:", err);
+            }
+        }
+
+        function renderServices() {
+            const container = document.getElementById('services-list');
+            const t = translations[currentLang];
+
+            if (globalServices.length === 0) {
+                container.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">${t.noServices}</p>`;
+                return;
+            }
+
+            container.innerHTML = globalServices.map(s => `
+                <div class="p-3 border rounded-xl bg-gray-50 flex justify-between items-center text-xs">
+                    <div>
+                        <div class="font-bold text-gray-800">${s.name}</div>
+                        <div class="text-gray-400 text-[11px]">${currentLang === 'it' ? 'Durata' : 'Duration'}: ${s.duration_minutes} mins</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-indigo-600">€${s.price.toFixed(2)}</div>
+                        <div class="mt-1 flex gap-2">
+                            <button onclick="editService('${s.id}', '${s.name}', ${s.price}, ${s.duration_minutes})" class="text-[11px] font-semibold text-blue-600 hover:underline">${currentLang === 'it' ? 'Modifica' : 'Edit'}</button>
+                            <button onclick="deleteService('${s.id}')" class="text-[11px] font-semibold text-red-600 hover:underline">${t.delete}</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function handleServiceSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-service-id').value;
+            const name = document.getElementById('service-name').value;
+            const price = parseFloat(document.getElementById('service-price').value);
+            const duration_minutes = parseInt(document.getElementById('service-duration').value);
+
+            const payload = { salon_id: currentSalonId, name, price, duration_minutes };
+
+            try {
+                let url = `${API_URL}/services`;
+                let method = "POST";
+                if (editId) {
+                    url = `${API_URL}/services/${editId}`;
+                    method = "PUT";
+                }
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    resetServiceForm();
+                    loadDashboard();
+                } else {
+                    alert("Failed to save service.");
+                }
+            } catch (err) {
+                console.error("Error saving service:", err);
+            }
+        }
+
+        function editService(id, name, price, duration) {
+            const t = translations[currentLang];
+            document.getElementById('edit-service-id').value = id;
+            document.getElementById('service-name').value = name;
+            document.getElementById('service-price').value = price;
+            document.getElementById('service-duration').value = duration;
+            const submitBtn = document.getElementById('service-submit-btn');
+            submitBtn.innerText = t.updateService;
+            submitBtn.classList.replace('bg-emerald-600', 'bg-blue-600');
+        }
+
+        function resetServiceForm() {
+            const t = translations[currentLang];
+            document.getElementById('edit-service-id').value = "";
+            document.getElementById('service-form').reset();
+            const submitBtn = document.getElementById('service-submit-btn');
+            submitBtn.innerText = t.saveService;
+            submitBtn.classList.replace('bg-blue-600', 'bg-emerald-600');
+        }
+
+        async function deleteService(id) {
+            const t = translations[currentLang];
+            if (!confirm(t.deleteServiceConfirm)) return;
+            try {
+                const res = await fetch(`${API_URL}/services/${id}`, { method: "DELETE" });
+                if (res.ok) loadDashboard();
+            } catch (err) {
+                console.error("Error deleting service:", err);
+            }
+        }
+
+        async function updateSettings(e) {
+            e.preventDefault();
+            const t = translations[currentLang];
+            const opening_time = document.getElementById('opening-time').value;
+            const closing_time = document.getElementById('closing-time').value;
+            const address = document.getElementById('salon-address-input').value;
+            const is_active = document.getElementById('accepting-bookings').value === "true";
+
+            try {
+                const res = await fetch(`${API_URL}/salons/${currentSalonId}/settings`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ opening_time, closing_time, address, is_active })
+                });
+                if (res.ok) {
+                    alert(t.settingsUpdated);
+                } else {
+                    alert(t.failedSettings);
+                }
+            } catch (err) {
+                console.error("Error updating settings:", err);
+            }
+        }
+
+        async function loadAppointments() {
+            if (!currentSalonId) return;
+            try {
+                const res = await fetch(`${API_URL}/appointments?salon_id=${currentSalonId}`);
+                allAppointments = await res.json();
+                renderAppointments();
+            } catch (err) {
+                console.error("Error loading appointments:", err);
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            ['upcoming', 'today', 'weekly', 'monthly', 'past'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    btn.className = "px-2.5 py-1 rounded-lg bg-white shadow-sm text-indigo-600 font-bold";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-lg text-gray-600 font-semibold";
+                }
+            });
+            renderAppointments();
+        }
+
+        function renderAppointments() {
+            const container = document.getElementById('appointments-container');
+            const t = translations[currentLang];
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let filtered = allAppointments.filter(app => {
+                const appDateStr = app.appointment_time.split('T')[0];
+                const status = app.status || 'pending';
+
+                if (currentTab === 'past') {
+                    return status === 'completed' || appDateStr < todayStr;
+                } else {
+                    if (status === 'completed') return false;
+
+                    if (currentTab === 'today') {
+                        return appDateStr === todayStr;
+                    } else if (currentTab === 'upcoming') {
+                        return appDateStr > todayStr;
+                    } else {
+                        return true;
+                    }
+                }
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p class="text-xs text-gray-400 text-center py-8">${t.noApps}</p>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(app => {
+                let servicesArray = [];
+                if (Array.isArray(app.services)) {
+                    servicesArray = app.services;
+                } else if (typeof app.services_json === 'string') {
+                    try { servicesArray = JSON.parse(app.services_json); } catch(e) {}
+                } else if (Array.isArray(app.services_json)) {
+                    servicesArray = app.services_json;
+                }
+
+                const servicesFormatted = servicesArray.length > 0 
+                    ? servicesArray.map(s => `<span class="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">${s.name || s}</span>`).join('') 
+                    : `<span class="italic text-gray-400 text-[10px]">No specific service name</span>`;
+
+                return `
+                    <div class="p-3 border rounded-xl bg-gray-50 flex justify-between items-center text-xs">
+                        <div class="space-y-1">
+                            <span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">
+                                ${app.appointment_time.replace('T', ' at ')}
+                            </span>
+                            <div class="font-bold text-gray-800">${app.customer_name} (${app.customer_phone || 'N/A'})</div>
+                            <div class="text-gray-400 text-[11px]">${app.customer_email || ''}</div>
+                            <div class="pt-1 flex flex-wrap items-center gap-1">
+                                <span class="font-semibold text-gray-500 text-[10px]">${t.servicesBooked}:</span> ${servicesFormatted}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${app.status !== 'completed' ? `<button onclick="updateStatus('${app.id}', 'completed')" class="bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg text-[11px]">${t.markServed}</button>` : `<span class="text-emerald-600 font-bold text-[11px]">Served ✓</span>`}
+                            <button onclick="deleteAppointment('${app.id}')" class="bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 font-bold px-2.5 py-1 rounded-lg text-[11px]">${t.delete}</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function updateStatus(id, status) {
+            try {
+                const res = await fetch(`${API_URL}/appointments/${id}/status`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status })
+                });
+                if (res.ok) loadAppointments();
+            } catch (err) {
+                console.error("Status update error:", err);
+            }
+        }
+
+        async function deleteAppointment(id) {
+            const t = translations[currentLang];
+            if (!confirm(t.deleteAppConfirm)) return;
+            try {
+                const res = await fetch(`${API_URL}/appointments/${id}`, { method: "DELETE" });
+                if (res.ok) loadAppointments();
+            } catch (err) {
+                console.error("Delete appointment error:", err);
+            }
+        }
+
+        function logout() {
+            window.location.href = "login.html";
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>

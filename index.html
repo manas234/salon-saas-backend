@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Salon Appointment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF Library for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <div>
+        <div class="bg-white border-b px-8 py-3 flex justify-end items-center shadow-sm">
+            <select id="lang-select" onchange="changeLanguage(this.value)" class="bg-gray-50 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg border focus:outline-none cursor-pointer">
+                <option value="en">English</option>
+                <option value="it">Italiano</option>
+            </select>
+        </div>
+
+        <main class="max-w-xl mx-auto p-6 my-6 bg-white rounded-2xl shadow-sm border space-y-6">
+            <div>
+                <h1 id="header-title" class="text-xl font-bold text-gray-900">Book Appointment</h1>
+                <p id="salon-address-display" class="text-xs text-gray-500 mt-1">📍 Loading address...</p>
+            </div>
+
+            <!-- Success Confirmation Screen (Initially Hidden) -->
+            <div id="confirmation-screen" class="hidden space-y-4 py-4">
+                <div class="text-center space-y-2">
+                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
+                    <h2 class="text-lg font-bold text-gray-900" id="conf-title">Booking Confirmed!</h2>
+                    <p class="text-xs text-gray-500" id="conf-subtitle">Thank you for booking with us. Here are your appointment details.</p>
+                </div>
+
+                <div class="bg-gray-50 border rounded-xl p-4 space-y-3 text-xs">
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500" id="conf-lbl-salon">Salon:</span>
+                        <span class="font-bold text-gray-800" id="conf-salon-name">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500" id="conf-lbl-name">Client Name:</span>
+                        <span class="font-bold text-gray-800" id="conf-client-name">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500" id="conf-lbl-phone">Phone:</span>
+                        <span class="font-bold text-gray-800" id="conf-client-phone">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500" id="conf-lbl-datetime">Date & Time:</span>
+                        <span class="font-bold text-indigo-600" id="conf-datetime">-</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block mb-1" id="conf-lbl-services">Booked Services:</span>
+                        <div id="conf-services-list" class="flex flex-wrap gap-1"></div>
+                    </div>
+                    <div class="flex justify-between pt-2 border-t font-bold text-gray-900">
+                        <span id="conf-lbl-total">Total Amount:</span>
+                        <span class="text-indigo-600" id="conf-total-price">€0.00</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button onclick="downloadConfirmation()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs shadow transition">📥 Download PDF Confirmation</button>
+                    <button onclick="window.location.reload()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 px-4 rounded-xl text-xs transition" id="conf-btn-new">Book Another</button>
+                </div>
+            </div>
+
+            <div id="booking-content-area" class="space-y-6">
+                <div class="space-y-3">
+                    <label id="lbl-select-services" class="block text-xs font-bold uppercase tracking-wider text-gray-500">Select Services</label>
+                    <input type="text" id="service-search" oninput="filterServices()" placeholder="Type to search services..." class="w-full p-2.5 border rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    
+                    <div id="services-checkbox-container" class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        <p class="text-xs text-gray-400 text-center py-4">Loading services...</p>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-1">
+                    <div class="font-semibold text-indigo-900" id="lbl-selected-services-title">Selected Services:</div>
+                    <div id="selected-services-summary" class="text-gray-600 italic">No services selected yet.</div>
+                    <div class="font-bold text-indigo-700 pt-1" id="total-summary">Total: €0.00 | Duration: 0 mins</div>
+                </div>
+
+                <form id="booking-form" onsubmit="submitBooking(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label id="lbl-name" class="block text-[11px] font-semibold text-gray-600 mb-1">Your Full Name</label>
+                            <input type="text" id="customer-name" required placeholder="John Doe" class="w-full p-2.5 border rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label id="lbl-phone" class="block text-[11px] font-semibold text-gray-600 mb-1">Phone Number</label>
+                            <input type="tel" id="customer-phone" required placeholder="+39 123 456 7890" class="w-full p-2.5 border rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label id="lbl-email" class="block text-[11px] font-semibold text-gray-600 mb-1">Email Address (Optional)</label>
+                        <input type="email" id="customer-email" placeholder="john@example.com" class="w-full p-2.5 border rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div>
+                        <label id="lbl-date" class="block text-[11px] font-semibold text-gray-600 mb-1">Appointment Date</label>
+                        <input type="date" id="appointment-date" required onchange="fetchTimeSlots()" class="w-full p-2.5 border rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label id="lbl-slots" class="block text-[11px] font-semibold text-gray-600">Available Time Slots</label>
+                            <div class="flex items-center gap-3 text-[10px] text-gray-500">
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> <span id="txt-legend-available">Available</span></span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> <span id="txt-legend-booked">Booked</span></span>
+                            </div>
+                        </div>
+                        <div id="slots-container" class="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-[180px] overflow-y-auto p-1 border rounded-xl bg-gray-50">
+                            <p id="txt-select-date-prompt" class="col-span-full text-xs text-gray-400 text-center py-6">Please select a date first to view slots.</p>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-book-now" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-xs shadow-md transition">Confirm & Book Appointment</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <footer id="txt-footer" class="py-4 text-center text-xs text-gray-400 border-t bg-white mt-10">
+        Salon Booking System
+    </footer>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        const urlParams = new URLSearchParams(window.location.search);
+        const salonSlug = urlParams.get("salon");
+
+        let currentSalonId = null;
+        let salonNameGlobal = "";
+        let salonServices = [];
+        let selectedServiceIds = new Set();
+        let selectedServicesMap = new Map();
+        let selectedTimeSlot = null;
+        let currentLang = 'en';
+        let lastBookingData = null;
+
+        const translations = {
+            en: {
+                selectServices: "Select Services",
+                searchPlaceholder: "Type to search services...",
+                selectedTitle: "Selected Services:",
+                noServicesSelected: "No services selected yet.",
+                yourName: "Your Full Name",
+                phone: "Phone Number",
+                email: "Email Address (Optional)",
+                date: "Appointment Date",
+                slots: "Available Time Slots",
+                available: "Available",
+                booked: "Booked",
+                selectDatePrompt: "Please select a date first to view slots.",
+                bookButton: "Confirm & Book Appointment",
+                footer: "Salon Booking System",
+                noServicesFound: "No services available for this salon.",
+                selectAtLeastOne: "Please select at least one service and a time slot.",
+                successBooking: "Appointment successfully booked!",
+                failBooking: "Failed to book appointment. Please try again.",
+                confTitle: "Booking Confirmed!",
+                confSubtitle: "Thank you for booking with us. Here are your appointment details.",
+                confSalon: "Salon:",
+                confClient: "Client Name:",
+                confPhone: "Phone:",
+                confDatetime: "Date & Time:",
+                confServices: "Booked Services:",
+                confTotal: "Total Amount:",
+                downloadBtn: "📥 Download PDF Confirmation",
+                bookAnother: "Book Another"
+            },
+            it: {
+                selectServices: "Seleziona Servizi",
+                searchPlaceholder: "Cerca servizi...",
+                selectedTitle: "Servizi Selezionati:",
+                noServicesSelected: "Nessun servizio selezionato.",
+                yourName: "Nome Completo",
+                phone: "Numero di Telefono",
+                email: "Indirizzo Email (Opzionale)",
+                date: "Data Appuntamento",
+                slots: "Orari Disponibili",
+                available: "Disponibile",
+                booked: "Prenotato",
+                selectDatePrompt: "Seleziona prima una data per visualizzare gli orari.",
+                bookButton: "Conferma e Prenota Appuntamento",
+                footer: "Sistema di Prenotazione Salone",
+                noServicesFound: "Nessun servizio disponibile per questo salone.",
+                selectAtLeastOne: "Seleziona almeno un servizio e un orario.",
+                successBooking: "Appuntamento prenotato con successo!",
+                failBooking: "Prenotazione fallita. Riprova.",
+                confTitle: "Prenotazione Confermata!",
+                confSubtitle: "Grazie per aver prenotato con noi. Ecco i dettagli del tuo appuntamento.",
+                confSalon: "Salone:",
+                confClient: "Nome Cliente:",
+                confPhone: "Telefono:",
+                confDatetime: "Data e Ora:",
+                confServices: "Servizi Prenotati:",
+                confTotal: "Importo Totale:",
+                downloadBtn: "📥 Scarica Conferma PDF",
+                bookAnother: "Prenota un Altro"
+            }
+        };
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+
+            document.getElementById('lbl-select-services').innerText = t.selectServices;
+            document.getElementById('service-search').placeholder = t.searchPlaceholder;
+            document.getElementById('lbl-selected-services-title').innerText = t.selectedTitle;
+            document.getElementById('lbl-name').innerText = t.yourName;
+            document.getElementById('lbl-phone').innerText = t.phone;
+            document.getElementById('lbl-email').innerText = t.email;
+            document.getElementById('lbl-date').innerText = t.date;
+            document.getElementById('lbl-slots').innerText = t.slots;
+            document.getElementById('txt-legend-available').innerText = t.available;
+            document.getElementById('txt-legend-booked').innerText = t.booked;
+            document.getElementById('btn-book-now').innerText = t.bookButton;
+            document.getElementById('txt-footer').innerText = t.footer;
+
+            document.getElementById('conf-title').innerText = t.confTitle;
+            document.getElementById('conf-subtitle').innerText = t.confSubtitle;
+            document.getElementById('conf-lbl-salon').innerText = t.confSalon;
+            document.getElementById('conf-lbl-name').innerText = t.confClient;
+            document.getElementById('conf-lbl-phone').innerText = t.confPhone;
+            document.getElementById('conf-lbl-datetime').innerText = t.confDatetime;
+            document.getElementById('conf-lbl-services').innerText = t.confServices;
+            document.getElementById('conf-lbl-total').innerText = t.confTotal;
+            document.getElementById('conf-btn-new').innerText = t.bookAnother;
+
+            if (selectedServiceIds.size === 0) {
+                document.getElementById('selected-services-summary').innerText = t.noServicesSelected;
+            }
+            renderServices(salonServices);
+        }
+
+        async function loadSalonDetails() {
+            if (!salonSlug) {
+                document.body.innerHTML = '<div class="p-8 text-center text-red-600 font-bold">Error: No salon specified in URL!</div>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/salons/${salonSlug}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    document.body.innerHTML = `
+                        <div class="max-w-xl mx-auto bg-white rounded-xl shadow-md p-6 mt-20 text-center py-12">
+                            <div class="text-red-600 text-5xl mb-4">⚠️</div>
+                            <h2 class="text-xl font-bold text-gray-800 mb-2">Salon Inactive or Expired</h2>
+                            <p class="text-gray-600 text-sm mb-6">${data.detail || "This salon is currently unavailable."}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                currentSalonId = data.salon.id;
+                salonNameGlobal = data.salon.name;
+                document.getElementById('header-title').innerText = `Book Appointment: ${salonNameGlobal}`;
+                document.getElementById('salon-address-display').innerText = `📍 ${data.salon.address}`;
+
+                salonServices = data.services;
+                renderServices(salonServices);
+
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('appointment-date').value = today;
+                fetchTimeSlots();
+
+            } catch (err) {
+                console.error("Error loading salon details:", err);
+            }
+        }
+
+        function renderServices(services) {
+            const container = document.getElementById('services-checkbox-container');
+            const t = translations[currentLang];
+
+            if (!services || services.length === 0) {
+                container.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">${t.noServicesFound}</p>`;
+                return;
+            }
+
+            container.innerHTML = services.map(s => {
+                const isChecked = selectedServiceIds.has(s.id) ? 'checked' : '';
+                return `
+                    <label class="flex items-center justify-between p-2.5 border rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer text-xs">
+                        <div class="flex items-center gap-2.5">
+                            <input type="checkbox" value="${s.id}" ${isChecked} onchange="toggleService('${s.id}', ${s.price}, ${s.duration_minutes}, '${s.name}')" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span class="font-medium text-gray-800">${s.name} <span class="text-gray-400 text-[11px]">(${s.duration_minutes} mins)</span></span>
+                        </div>
+                        <span class="font-bold text-indigo-600">€${s.price.toFixed(2)}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function filterServices() {
+            const query = document.getElementById('service-search').value.toLowerCase();
+            const filtered = salonServices.filter(s => s.name.toLowerCase().includes(query));
+            renderServices(filtered);
+        }
+
+        function toggleService(id, price, duration, name) {
+            if (selectedServiceIds.has(id)) {
+                selectedServiceIds.delete(id);
+                selectedServicesMap.delete(id);
+            } else {
+                selectedServiceIds.add(id);
+                selectedServicesMap.set(id, { id, price, duration, name });
+            }
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const t = translations[currentLang];
+            const summaryEl = document.getElementById('selected-services-summary');
+            const totalEl = document.getElementById('total-summary');
+
+            if (selectedServiceIds.size === 0) {
+                summaryEl.innerText = t.noServicesSelected;
+                totalEl.innerText = "Total: €0.00 | Duration: 0 mins";
+                return;
+            }
+
+            let totalPrice = 0;
+            let totalDuration = 0;
+            let names = [];
+
+            selectedServicesMap.forEach(s => {
+                totalPrice += s.price;
+                totalDuration += s.duration;
+                names.push(s.name);
+            });
+
+            summaryEl.innerHTML = names.map(n => `<span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded text-[10px] mr-1 inline-block mb-1">${n}</span>`).join('');
+            totalEl.innerText = `Total: €${totalPrice.toFixed(2)} | Duration: ${totalDuration} mins`;
+        }
+
+        async function fetchTimeSlots() {
+            const date = document.getElementById('appointment-date').value;
+            const container = document.getElementById('slots-container');
+
+            if (!date || !currentSalonId) return;
+
+            container.innerHTML = '<p class="col-span-full text-xs text-gray-400 text-center py-4">Loading slots...</p>';
+
+            try {
+                const res = await fetch(`${API_URL}/slots?salon_id=${currentSalonId}&date=${date}`);
+                const slots = await res.json();
+
+                if (!res.ok || !slots || slots.length === 0) {
+                    container.innerHTML = '<p class="col-span-full text-xs text-gray-400 text-center py-4">No slots available for this date.</p>';
+                    return;
+                }
+
+                container.innerHTML = slots.map(slot => {
+                    if (slot.is_booked) {
+                        return `<div class="bg-red-50 border border-red-100 text-red-600 font-semibold py-2 rounded-xl text-center text-[11px] cursor-not-allowed">${slot.time} (Booked)</div>`;
+                    } else {
+                        const isSelected = selectedTimeSlot === slot.time ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-200 text-gray-700 hover:bg-indigo-50';
+                        return `<button type="button" onclick="selectSlot('${slot.time}')" class="border py-2 rounded-xl text-center text-[11px] font-bold transition ${isSelected}">${slot.time}</button>`;
+                    }
+                }).join('');
+
+            } catch (err) {
+                console.error("Error loading slots:", err);
+                container.innerHTML = '<p class="col-span-full text-xs text-red-400 text-center py-4">Failed to load slots.</p>';
+            }
+        }
+
+        function selectSlot(time) {
+            selectedTimeSlot = time;
+            fetchTimeSlots();
+        }
+
+        async function submitBooking(e) {
+            e.preventDefault();
+            const t = translations[currentLang];
+
+            if (selectedServiceIds.size === 0 || !selectedTimeSlot) {
+                alert(t.selectAtLeastOne);
+                return;
+            }
+
+            const customer_name = document.getElementById('customer-name').value;
+            const customer_phone = document.getElementById('customer-phone').value;
+            const customer_email = document.getElementById('customer-email').value;
+            const date = document.getElementById('appointment-date').value;
+            const appointment_time = `${date}T${selectedTimeSlot}:00`;
+
+            const servicesList = [];
+            let totalPrice = 0;
+            selectedServicesMap.forEach(s => {
+                servicesList.push({ id: s.id, name: s.name, price: s.price });
+                totalPrice += s.price;
+            });
+
+            const payload = {
+                salon_id: currentSalonId,
+                customer_name,
+                customer_phone,
+                customer_email,
+                appointment_time,
+                services: servicesList
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/appointments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    lastBookingData = {
+                        salonName: salonNameGlobal,
+                        clientName: customer_name,
+                        clientPhone: customer_phone,
+                        dateTime: appointment_time.replace('T', ' at '),
+                        services: servicesList,
+                        total: totalPrice
+                    };
+
+                    document.getElementById('booking-content-area').classList.add('hidden');
+                    document.getElementById('confirmation-screen').classList.remove('hidden');
+
+                    document.getElementById('conf-salon-name').innerText = lastBookingData.salonName;
+                    document.getElementById('conf-client-name').innerText = lastBookingData.clientName;
+                    document.getElementById('conf-client-phone').innerText = lastBookingData.clientPhone;
+                    document.getElementById('conf-datetime').innerText = lastBookingData.dateTime;
+                    document.getElementById('conf-total-price').innerText = `€${lastBookingData.total.toFixed(2)}`;
+                    
+                    document.getElementById('conf-services-list').innerHTML = lastBookingData.services.map(s => 
+                        `<span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded text-[10px]">${s.name} (€${s.price.toFixed(2)})</span>`
+                    ).join('');
+
+                } else {
+                    const errData = await res.json();
+                    alert(errData.detail || t.failBooking);
+                }
+            } catch (err) {
+                console.error("Booking error:", err);
+                alert(t.failBooking);
+            }
+        }
+
+        function downloadConfirmation() {
+            if (!lastBookingData) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Header Banner
+            doc.setFillColor(79, 70, 229);
+            doc.rect(0, 0, 210, 30, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("SALON APPOINTMENT CONFIRMATION", 15, 19);
+
+            // Details
+            doc.setTextColor(55, 65, 81);
+            doc.setFontSize(11);
+            
+            let y = 45;
+            doc.text("Salon Name:", 15, y);
+            doc.setFont("helvetica", "bold");
+            doc.text(lastBookingData.salonName, 55, y);
+            
+            y += 10;
+            doc.setFont("helvetica", "normal");
+            doc.text("Client Name:", 15, y);
+            doc.setFont("helvetica", "bold");
+            doc.text(lastBookingData.clientName, 55, y);
+
+            y += 10;
+            doc.setFont("helvetica", "normal");
+            doc.text("Phone:", 15, y);
+            doc.setFont("helvetica", "bold");
+            doc.text(lastBookingData.clientPhone, 55, y);
+
+            y += 10;
+            doc.setFont("helvetica", "normal");
+            doc.text("Date & Time:", 15, y);
+            doc.setFont("helvetica", "bold");
+            doc.text(lastBookingData.dateTime, 55, y);
+
+            // Divider Line
+            y += 10;
+            doc.setDrawColor(229, 231, 235);
+            doc.line(15, y, 195, y);
+
+            // Services List
+            y += 15;
+            doc.setFont("helvetica", "bold");
+            doc.text("Booked Services:", 15, y);
+
+            y += 8;
+            doc.setFont("helvetica", "normal");
+            lastBookingData.services.forEach(s => {
+                doc.text(`• ${s.name}`, 20, y);
+                doc.text(`€${s.price.toFixed(2)}`, 175, y, { align: 'right' });
+                y += 8;
+            });
+
+            // Divider Line
+            y += 5;
+            doc.line(15, y, 195, y);
+
+            // Total Amount
+            y += 12;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(13);
+            doc.setTextColor(79, 70, 229);
+            doc.text("Total Amount:", 15, y);
+            doc.text(`€${lastBookingData.total.toFixed(2)}`, 175, y, { align: 'right' });
+
+            // Footer Note
+            y += 25;
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(9);
+            doc.setTextColor(156, 163, 175);
+            doc.text("Thank you for choosing our services! Please arrive 5 minutes prior.", 15, y);
+
+            // Save PDF
+            doc.save(`Appointment_${lastBookingData.clientName.replace(/\s+/g, '_')}.pdf`);
+        }
+
+        loadSalonDetails();
+    </script>
+</body>
+</html>

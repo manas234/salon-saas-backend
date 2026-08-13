@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import os
 import json
 from datetime import datetime
+import uuid
 
 # Line 11: Render ke environment se URL uthaye ga, agar nahi mila toh local sqlite use kare ga
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./salon.db")
@@ -101,6 +102,15 @@ def serialize_salon(salon):
         "owner_email": salon.owner_email
     }
 
+def find_salon_by_identifier(db: Session, identifier: str):
+    if not identifier or identifier == "null":
+        return None
+    try:
+        uuid.UUID(identifier)
+        return db.query(Salon).filter(Salon.id == identifier).first()
+    except ValueError:
+        return db.query(Salon).filter(Salon.slug == identifier).first()
+
 @app.get("/")
 def serve_index():
     if os.path.exists("index.html"):
@@ -130,7 +140,6 @@ def get_all_salons(db: Session = Depends(get_db)):
 @app.post("/salons")
 async def create_salon(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    import uuid
     
     existing = db.query(Salon).filter(Salon.slug == data.get("slug")).first()
     if existing:
@@ -154,7 +163,7 @@ async def create_salon(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/salons/{identifier}")
 def get_salon(identifier: str, db: Session = Depends(get_db)):
-    salon = db.query(Salon).filter((Salon.id == identifier) | (Salon.slug == identifier)).first()
+    salon = find_salon_by_identifier(db, identifier)
     if not salon:
         raise HTTPException(status_code=404, detail="Salon not found")
     services = db.query(Service).filter(Service.salon_id == salon.id).all()
@@ -166,7 +175,7 @@ def get_salon(identifier: str, db: Session = Depends(get_db)):
 @app.put("/salons/{identifier}/settings")
 async def update_salon_settings(request: Request, identifier: str, db: Session = Depends(get_db)):
     data = await request.json()
-    salon = db.query(Salon).filter((Salon.id == identifier) | (Salon.slug == identifier)).first()
+    salon = find_salon_by_identifier(db, identifier)
     if not salon:
         raise HTTPException(status_code=404, detail="Salon not found")
     if "address" in data: salon.address = data["address"]
@@ -185,7 +194,6 @@ def get_services(salon_id: str, db: Session = Depends(get_db)):
 @app.post("/services")
 async def create_service(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    import uuid
     new_service = Service(
         id=str(uuid.uuid4()),
         salon_id=data["salon_id"],
@@ -288,7 +296,6 @@ def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
 @app.post("/appointments")
 async def create_appointment(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    import uuid
     
     services_data = data.get("services", [])
     

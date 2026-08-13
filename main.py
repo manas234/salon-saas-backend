@@ -107,6 +107,12 @@ def serve_index():
 def serve_admin():
     return FileResponse("admin.html")
 
+@app.get("/login.html")
+def serve_login():
+    if os.path.exists("login.html"):
+        return FileResponse("login.html")
+    return {"detail": "login file not found"}
+
 @app.get("/super-admin.html")
 def serve_superadmin():
     if os.path.exists("super-admin.html"):

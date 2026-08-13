@@ -188,15 +188,21 @@ async def update_salon_settings(request: Request, identifier: str, db: Session =
 
 @app.get("/services")
 def get_services(salon_id: str, db: Session = Depends(get_db)):
-    services = db.query(Service).filter(Service.salon_id == salon_id).all()
+    resolved_salon = find_salon_by_identifier(db, salon_id)
+    target_id = resolved_salon.id if resolved_salon else salon_id
+    services = db.query(Service).filter(Service.salon_id == target_id).all()
     return [{"id": s.id, "name": s.name, "price": s.price, "duration_minutes": s.duration_minutes} for s in services]
 
 @app.post("/services")
 async def create_service(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
+    s_id = data["salon_id"]
+    resolved_salon = find_salon_by_identifier(db, s_id)
+    final_salon_id = resolved_salon.id if resolved_salon else s_id
+
     new_service = Service(
         id=str(uuid.uuid4()),
-        salon_id=data["salon_id"],
+        salon_id=final_salon_id,
         name=data["name"],
         price=data["price"],
         duration_minutes=data["duration_minutes"]
@@ -226,8 +232,8 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 @app.get("/slots")
-def get_slots(salon_id: str, date: str, db: Session = Depends(get_db)):
-    salon = find_salon_by_identifier(db, salon_id)
+def get_slots(salon_id: str, date: str, db: Session = Depends(get_db))[cite: 2]:
+    salon = find_salon_by_identifier(db, salon_id)[cite: 2]
     if not salon:
         return []
     
@@ -263,13 +269,12 @@ def get_slots(salon_id: str, date: str, db: Session = Depends(get_db)):
                 "is_booked": is_booked
             })
             
-    return slots
+    return slots[cite: 2]
 
 @app.get("/appointments")
 def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
     query = db.query(Appointment)
     if salon_id:
-        # Resolve salon_id in case a slug was passed
         resolved_salon = find_salon_by_identifier(db, salon_id)
         target_id = resolved_salon.id if resolved_salon else salon_id
         query = query.filter(Appointment.salon_id == target_id)
@@ -300,7 +305,6 @@ def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):
 async def create_appointment(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     
-    # Resolve salon_id in case a slug was passed instead of uuid
     s_id = data["salon_id"]
     resolved_salon = find_salon_by_identifier(db, s_id)
     final_salon_id = resolved_salon.id if resolved_salon else s_id

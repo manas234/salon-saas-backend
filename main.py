@@ -229,12 +229,21 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
 def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str = None, db: Session = Depends(get_db)):
     try:
         identifier = salon_id or salon or id or "gnstudio"
-        if not date: date = datetime.now().strftime("%Y-%m-%d")
+        if not date: 
+            date = datetime.now().strftime("%Y-%m-%d")
+        else:
+            if "/" in date:
+                parts = date.split("/")
+                if len(parts) == 3:
+                    if len(parts[2]) == 4:
+                        date = f"{parts[2]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                    elif len(parts[0]) == 4:
+                        date = f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
             
         resolved_salon = find_salon_by_identifier(db, identifier)
-        if not resolved_salon: resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
+        if not resolved_salon: 
+            resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
         
-        # Fallback values
         open_hour = 9
         close_hour = 19
         if resolved_salon:
@@ -262,7 +271,9 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
                     if hour < now.hour or (hour == now.hour and now.minute > minute): is_booked = True
                 slots.append({"time": time_str, "is_booked": is_booked})
         return slots
-    except: return []
+    except Exception as e:
+        print(f"Slot error: {e}")
+        return []
 
 @app.get("/appointments")
 def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):

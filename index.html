@@ -136,7 +136,7 @@
         let currentSalonId = null;
         let salonNameGlobal = "";
         let salonServices = [];
-        let servicesDataMap = new Map(); // Global lookup map to prevent broken parsing
+        let servicesDataMap = new Map();
         let selectedServiceIds = new Set();
         let selectedServicesMap = new Map();
         let selectedTimeSlot = null;
@@ -236,7 +236,7 @@
             if (selectedServiceIds.size === 0) {
                 document.getElementById('selected-services-summary').innerText = t.noServicesSelected;
             }
-            renderServices(salonServices);
+            filterServices();
         }
 
         async function loadSalonDetails() {
@@ -267,7 +267,6 @@
 
                 salonServices = data.services;
                 
-                // Populate global service lookup map safely
                 servicesDataMap.clear();
                 salonServices.forEach(s => {
                     servicesDataMap.set(String(s.id), {
@@ -278,7 +277,7 @@
                     });
                 });
 
-                renderServices(salonServices);
+                filterServices();
 
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('appointment-date').value = today;
@@ -495,7 +494,6 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Header Banner
             doc.setFillColor(79, 70, 229);
             doc.rect(0, 0, 210, 30, 'F');
             
@@ -504,7 +502,6 @@
             doc.setFontSize(16);
             doc.text("SALON APPOINTMENT CONFIRMATION", 15, 19);
 
-            // Details
             doc.setTextColor(55, 65, 81);
             doc.setFontSize(11);
             
@@ -531,12 +528,10 @@
             doc.setFont("helvetica", "bold");
             doc.text(lastBookingData.dateTime, 55, y);
 
-            // Divider Line
             y += 10;
             doc.setDrawColor(229, 231, 235);
             doc.line(15, y, 195, y);
 
-            // Services List
             y += 15;
             doc.setFont("helvetica", "bold");
             doc.text("Booked Services:", 15, y);
@@ -550,11 +545,9 @@
                 y += 8;
             });
 
-            // Divider Line
             y += 5;
             doc.line(15, y, 195, y);
 
-            // Total Amount
             y += 12;
             doc.setFont("helvetica", "bold");
             doc.setFontSize(13);
@@ -562,14 +555,12 @@
             doc.text("Total Amount:", 15, y);
             doc.text(`€${lastBookingData.total.toFixed(2)}`, 175, y, { align: 'right' });
 
-            // Footer Note
             y += 25;
             doc.setFont("helvetica", "italic");
             doc.setFontSize(9);
             doc.setTextColor(156, 163, 175);
             doc.text("Thank you for choosing our services! Please arrive 5 minutes prior.", 15, y);
 
-            // Save PDF
             doc.save(`Appointment_${lastBookingData.clientName.replace(/\s+/g, '_')}.pdf`);
         }
 

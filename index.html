@@ -136,6 +136,7 @@
         let currentSalonId = null;
         let salonNameGlobal = "";
         let salonServices = [];
+        let servicesDataMap = new Map(); // Global lookup map to prevent broken parsing
         let selectedServiceIds = new Set();
         let selectedServicesMap = new Map();
         let selectedTimeSlot = null;
@@ -265,6 +266,18 @@
                 document.getElementById('salon-address-display').innerText = `📍 ${data.salon.address}`;
 
                 salonServices = data.services;
+                
+                // Populate global service lookup map safely
+                servicesDataMap.clear();
+                salonServices.forEach(s => {
+                    servicesDataMap.set(String(s.id), {
+                        id: s.id,
+                        name: s.name,
+                        price: parseFloat(s.price) || 0,
+                        duration: parseInt(s.duration_minutes) || 0
+                    });
+                });
+
                 renderServices(salonServices);
 
                 const today = new Date().toISOString().split('T')[0];
@@ -286,14 +299,18 @@
             }
 
             container.innerHTML = services.map(s => {
-                const isChecked = selectedServiceIds.has(s.id) ? 'checked' : '';
+                const sIdStr = String(s.id);
+                const isChecked = selectedServiceIds.has(sIdStr) ? 'checked' : '';
+                const priceNum = parseFloat(s.price) || 0;
+                const durationNum = parseInt(s.duration_minutes) || 0;
+                
                 return `
                     <label class="flex items-center justify-between p-2.5 border rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer text-xs">
                         <div class="flex items-center gap-2.5">
-                            <input type="checkbox" value="${s.id}" ${isChecked} onchange="toggleService('${s.id}', ${s.price}, ${s.duration_minutes}, '${s.name}')" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <span class="font-medium text-gray-800">${s.name} <span class="text-gray-400 text-[11px]">(${s.duration_minutes} mins)</span></span>
+                            <input type="checkbox" value="${sIdStr}" ${isChecked} onchange="toggleService('${sIdStr}')" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span class="font-medium text-gray-800">${s.name} <span class="text-gray-400 text-[11px]">(${durationNum} mins)</span></span>
                         </div>
-                        <span class="font-bold text-indigo-600">€${s.price.toFixed(2)}</span>
+                        <span class="font-bold text-indigo-600">€${priceNum.toFixed(2)}</span>
                     </label>
                 `;
             }).join('');
@@ -305,13 +322,18 @@
             renderServices(filtered);
         }
 
-        function toggleService(id, price, duration, name) {
-            if (selectedServiceIds.has(id)) {
-                selectedServiceIds.delete(id);
-                selectedServicesMap.delete(id);
+        function toggleService(id) {
+            const strId = String(id);
+            const serviceObj = servicesDataMap.get(strId);
+            
+            if (!serviceObj) return;
+
+            if (selectedServiceIds.has(strId)) {
+                selectedServiceIds.delete(strId);
+                selectedServicesMap.delete(strId);
             } else {
-                selectedServiceIds.add(id);
-                selectedServicesMap.set(id, { id, price, duration, name });
+                selectedServiceIds.add(strId);
+                selectedServicesMap.set(strId, serviceObj);
             }
             updateSummary();
         }
@@ -332,8 +354,8 @@
             let names = [];
 
             selectedServicesMap.forEach(s => {
-                totalPrice += s.price;
-                totalDuration += s.duration;
+                totalPrice += parseFloat(s.price) || 0;
+                totalDuration += parseInt(s.duration) || 0;
                 names.push(s.name);
             });
 
@@ -347,7 +369,6 @@
 
             if (!dateInput || !currentSalonId) return;
 
-            // Safe formatting to ensure YYYY-MM-DD regardless of browser regional settings
             let date = dateInput;
             if (dateInput.includes('/')) {
                 const parts = dateInput.split('/');
@@ -414,8 +435,9 @@
             const servicesList = [];
             let totalPrice = 0;
             selectedServicesMap.forEach(s => {
-                servicesList.push({ id: s.id, name: s.name, price: s.price });
-                totalPrice += s.price;
+                const itemPrice = parseFloat(s.price) || 0;
+                servicesList.push({ id: s.id, name: s.name, price: itemPrice });
+                totalPrice += itemPrice;
             });
 
             const payload = {
@@ -454,7 +476,7 @@
                     document.getElementById('conf-total-price').innerText = `€${lastBookingData.total.toFixed(2)}`;
                     
                     document.getElementById('conf-services-list').innerHTML = lastBookingData.services.map(s => 
-                        `<span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded text-[10px]">${s.name} (€${s.price.toFixed(2)})</span>`
+                        `<span class="bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded text-[10px]">${s.name} (€${(parseFloat(s.price)||0).toFixed(2)})</span>`
                     ).join('');
 
                 } else {
@@ -522,8 +544,9 @@
             y += 8;
             doc.setFont("helvetica", "normal");
             lastBookingData.services.forEach(s => {
+                const p = parseFloat(s.price) || 0;
                 doc.text(`• ${s.name}`, 20, y);
-                doc.text(`€${s.price.toFixed(2)}`, 175, y, { align: 'right' });
+                doc.text(`€${p.toFixed(2)}`, 175, y, { align: 'right' });
                 y += 8;
             });
 

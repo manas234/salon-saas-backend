@@ -232,8 +232,13 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 @app.get("/slots")
-def get_slots(salon_id: str, date: str, db: Session = Depends(get_db))[cite: 2]:
-    salon = find_salon_by_identifier(db, salon_id)[cite: 2]
+def get_slots(salon_id: str = "gnstudio", date: str = None, db: Session = Depends(get_db)):
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+        
+    salon = find_salon_by_identifier(db, salon_id)
+    if not salon:
+        salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
     if not salon:
         return []
     
@@ -269,7 +274,7 @@ def get_slots(salon_id: str, date: str, db: Session = Depends(get_db))[cite: 2]:
                 "is_booked": is_booked
             })
             
-    return slots[cite: 2]
+    return slots
 
 @app.get("/appointments")
 def get_appointments(salon_id: str = None, db: Session = Depends(get_db)):

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -68,6 +69,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files so images like salonx.png are accessible
+app.mount("/static", StaticFiles(directory="."), name="static")
 
 @app.on_event("startup")
 def startup_event():
@@ -232,9 +236,6 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
         
         resolved_salon = find_salon_by_identifier(db, identifier)
         if not resolved_salon:
-            # Don't silently fall back to a different salon's hours/appointments —
-            # that hides real bugs (e.g. this salon's row vanished from the DB
-            # after a restart on an ephemeral filesystem).
             return []
             
         if not date: 
@@ -284,7 +285,6 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
             time_str = f"{hour:02d}:{minute:02d}"
             is_booked = time_str in booked_times
 
-            # If salon is inactive/paused, force EVERY slot to be booked so booking is fully disabled
             if resolved_salon and resolved_salon.is_active is False:
                 is_booked = True
             elif date == now.strftime("%Y-%m-%d"):

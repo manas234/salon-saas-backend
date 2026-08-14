@@ -11,8 +11,23 @@ from datetime import datetime
 import uuid
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./salon.db")
-connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+
+# Robust PostgreSQL pool settings for Supabase
+if "postgresql" in DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,      # Automatically reconnects if the database drops the connection
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=300         # Recycles connections every 5 minutes to prevent stale pooler drops
+    )
+else:
+    connect_args = {"check_same_thread": False}
+    engine = create_engine(DATABASE_URL, connect_args=connect_args)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -250,10 +265,27 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
                         date = f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
         
         def parse_hm_to_minutes(value, default_minutes):
+            if not value:
+                return default_minutes
             try:
-                h_str, m_str = value.split(":")[0], value.split(":")[1]
-                return int(h_str) * 60 + int(m_str)
-            except Exception:
+                clean_val = str(value).strip().upper()
+                is_pm = "PM" in clean_val
+                is_am = "AM" in clean_val
+                
+                time_part = clean_val.replace("AM", "").replace("PM", "").strip()
+                parts = time_part.split(":")
+                
+                hours = int(parts[0])
+                minutes = int(parts[1]) if len(parts) > 1 else 0
+
+                if is_pm and hours < 12:
+                    hours += 12
+                elif is_am and hours == 12:
+                    hours = 0
+                    
+                return hours * 60 + minutes
+            except Exception as e:
+                print(f"Error parsing time '{value}': {e}")
                 return default_minutes
 
         open_total_minutes = 9 * 60

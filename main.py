@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, text, cast
+from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
@@ -229,6 +229,14 @@ def delete_service(service_id: str, db: Session = Depends(get_db)):
 def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str = None, db: Session = Depends(get_db)):
     try:
         identifier = salon_id or salon or id or "gnstudio"
+        
+        resolved_salon = find_salon_by_identifier(db, identifier)
+        if not resolved_salon:
+            # Don't silently fall back to a different salon's hours/appointments —
+            # that hides real bugs (e.g. this salon's row vanished from the DB
+            # after a restart on an ephemeral filesystem).
+            return []
+            
         if not date: 
             date = datetime.now().strftime("%Y-%m-%d")
         else:
@@ -239,23 +247,24 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
                         date = f"{parts[2]}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
                     elif len(parts[0]) == 4:
                         date = f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
-            
-        resolved_salon = find_salon_by_identifier(db, identifier)
-        if not resolved_salon: 
-            resolved_salon = db.query(Salon).filter(Salon.slug == "gnstudio").first()
         
-        open_hour = 9
-        close_hour = 19
+        def parse_hm_to_minutes(value, default_minutes):
+            try:
+                h_str, m_str = value.split(":")[0], value.split(":")[1]
+                return int(h_str) * 60 + int(m_str)
+            except Exception:
+                return default_minutes
+
+        open_total_minutes = 9 * 60
+        close_total_minutes = 19 * 60
         if resolved_salon:
-            try: open_hour = int(resolved_salon.opening_time.split(":")[0])
-            except: pass
-            try: close_hour = int(resolved_salon.closing_time.split(":")[0])
-            except: pass
-        if close_hour <= open_hour: close_hour += 24
+            open_total_minutes = parse_hm_to_minutes(resolved_salon.opening_time, open_total_minutes)
+            close_total_minutes = parse_hm_to_minutes(resolved_salon.closing_time, close_total_minutes)
+        if close_total_minutes <= open_total_minutes:
+            close_total_minutes += 24 * 60
 
         booked_apps = []
         if resolved_salon:
-            # Safe query using Python filtering instead of SQL LIKE on timestamp
             all_apps = db.query(Appointment).filter(Appointment.salon_id == resolved_salon.id).all()
             booked_apps = [app for app in all_apps if app.appointment_time and str(app.appointment_time).startswith(date)]
         
@@ -268,13 +277,22 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
 
         slots = []
         now = datetime.now()
-        for hour in range(open_hour, close_hour):
-            for minute in (0, 30):
-                time_str = f"{hour%24:02d}:{minute:02d}"
-                is_booked = time_str in booked_times
-                if date == now.strftime("%Y-%m-%d"):
-                    if hour < now.hour or (hour == now.hour and now.minute > minute): is_booked = True
-                slots.append({"time": time_str, "is_booked": is_booked})
+        total_minutes = open_total_minutes
+        while total_minutes < close_total_minutes:
+            hour = (total_minutes // 60) % 24
+            minute = total_minutes % 60
+            time_str = f"{hour:02d}:{minute:02d}"
+            is_booked = time_str in booked_times
+
+            # If salon is inactive/paused, force EVERY slot to be booked so booking is fully disabled
+            if resolved_salon and resolved_salon.is_active is False:
+                is_booked = True
+            elif date == now.strftime("%Y-%m-%d"):
+                if hour < now.hour or (hour == now.hour and now.minute > minute):
+                    is_booked = True
+
+            slots.append({"time": time_str, "is_booked": is_booked})
+            total_minutes += 30
         return slots
     except Exception as e:
         print(f"Slot error: {e}")
@@ -305,6 +323,10 @@ async def create_appointment(request: Request, db: Session = Depends(get_db)):
     s_id = data["salon_id"]
     resolved_salon = find_salon_by_identifier(db, s_id)
     final_salon_id = resolved_salon.id if resolved_salon else s_id
+    
+    if resolved_salon and resolved_salon.is_active is False:
+        raise HTTPException(status_code=400, detail="Bookings are currently paused for this salon.")
+
     new_app = Appointment(
         id=str(uuid.uuid4()),
         salon_id=final_salon_id,

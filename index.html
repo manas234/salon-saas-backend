@@ -8,10 +8,11 @@
     <!-- jsPDF Library for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between" onload="loadSalonDetails()">
 
     <div>
-        <div class="bg-white border-b px-8 py-3 flex justify-end items-center shadow-sm">
+        <div class="bg-white border-b px-8 py-3 flex justify-between items-center shadow-sm">
+            <img src="salonx.png" alt="SalonX Logo" class="h-8 w-auto object-contain">
             <select id="lang-select" onchange="changeLanguage(this.value)" class="bg-gray-50 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg border focus:outline-none cursor-pointer">
                 <option value="en">English</option>
                 <option value="it">Italiano</option>
@@ -22,6 +23,11 @@
             <div>
                 <h1 id="header-title" class="text-xl font-bold text-gray-900">Book Appointment</h1>
                 <p id="salon-address-display" class="text-xs text-gray-500 mt-1">📍 Loading address...</p>
+            </div>
+
+            <!-- Salon Paused / Closed Notice Banner (Hidden by default) -->
+            <div id="salon-paused-banner" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold text-center">
+                ⚠️ This salon is currently closed and not accepting new bookings. Please try again later.
             </div>
 
             <!-- Success Confirmation Screen (Initially Hidden) -->
@@ -127,7 +133,7 @@
     </footer>
 
     <script>
-         const API_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
+         const API_URL = window.location.protocol === "file:" || window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
              ? "http://127.0.0.1:8000" 
              : "https://salon-saas-backend-na9l.onrender.com";
         const urlParams = new URLSearchParams(window.location.search);
@@ -142,9 +148,11 @@
         let selectedTimeSlot = null;
         let currentLang = 'en';
         let lastBookingData = null;
+        let isSalonActive = true;
 
         const translations = {
             en: {
+                bookAppointmentTitle: "Book Appointment",
                 selectServices: "Select Services",
                 searchPlaceholder: "Type to search services...",
                 selectedTitle: "Selected Services:",
@@ -172,9 +180,11 @@
                 confServices: "Booked Services:",
                 confTotal: "Total Amount:",
                 downloadBtn: "📥 Download PDF Confirmation",
-                bookAnother: "Book Another"
+                bookAnother: "Book Another",
+                salonPausedMsg: "This salon is currently closed and not accepting new bookings."
             },
             it: {
+                bookAppointmentTitle: "Prenota Appuntamento",
                 selectServices: "Seleziona Servizi",
                 searchPlaceholder: "Cerca servizi...",
                 selectedTitle: "Servizi Selezionati:",
@@ -202,13 +212,18 @@
                 confServices: "Servizi Prenotati:",
                 confTotal: "Importo Totale:",
                 downloadBtn: "📥 Scarica Conferma PDF",
-                bookAnother: "Prenota un Altro"
+                bookAnother: "Prenota un Altro",
+                salonPausedMsg: "Questo salone è attualmente chiuso e non accetta nuove prenotazioni."
             }
         };
 
         function changeLanguage(lang) {
             currentLang = lang;
             const t = translations[lang];
+
+            if (salonNameGlobal) {
+                document.getElementById('header-title').innerText = `${t.bookAppointmentTitle}: ${salonNameGlobal}`;
+            }
 
             document.getElementById('lbl-select-services').innerText = t.selectServices;
             document.getElementById('service-search').placeholder = t.searchPlaceholder;
@@ -222,6 +237,7 @@
             document.getElementById('txt-legend-booked').innerText = t.booked;
             document.getElementById('btn-book-now').innerText = t.bookButton;
             document.getElementById('txt-footer').innerText = t.footer;
+            document.getElementById('salon-paused-banner').innerText = `⚠️ ${t.salonPausedMsg}`;
 
             document.getElementById('conf-title').innerText = t.confTitle;
             document.getElementById('conf-subtitle').innerText = t.confSubtitle;
@@ -262,8 +278,23 @@
 
                 currentSalonId = data.salon.id;
                 salonNameGlobal = data.salon.name;
-                document.getElementById('header-title').innerText = `Book Appointment: ${salonNameGlobal}`;
+                isSalonActive = data.salon.is_active ?? true;
+
+                const t = translations[currentLang];
+                document.getElementById('header-title').innerText = `${t.bookAppointmentTitle}: ${salonNameGlobal}`;
                 document.getElementById('salon-address-display').innerText = `📍 ${data.salon.address}`;
+
+                const pausedBanner = document.getElementById('salon-paused-banner');
+                const bookingForm = document.getElementById('booking-form');
+                if (!isSalonActive) {
+                    pausedBanner.classList.remove('hidden');
+                    bookingForm.style.opacity = "0.5";
+                    bookingForm.style.pointerEvents = "none";
+                } else {
+                    pausedBanner.classList.add('hidden');
+                    bookingForm.style.opacity = "1";
+                    bookingForm.style.pointerEvents = "auto";
+                }
 
                 salonServices = data.services;
                 
@@ -283,9 +314,38 @@
                 filterServices();
                 fetchTimeSlots();
 
+                setInterval(() => {
+                    loadSalonDetailsSilent();
+                }, 8000);
+
             } catch (err) {
                 console.error("Error loading salon details:", err);
             }
+        }
+
+        async function loadSalonDetailsSilent() {
+            if (!salonSlug) return;
+            try {
+                const res = await fetch(`${API_URL}/salons/${salonSlug}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const newActiveState = data.salon.is_active ?? true;
+                if (newActiveState !== isSalonActive) {
+                    isSalonActive = newActiveState;
+                    const pausedBanner = document.getElementById('salon-paused-banner');
+                    const bookingForm = document.getElementById('booking-form');
+                    if (!isSalonActive) {
+                        pausedBanner.classList.remove('hidden');
+                        bookingForm.style.opacity = "0.5";
+                        bookingForm.style.pointerEvents = "none";
+                    } else {
+                        pausedBanner.classList.add('hidden');
+                        bookingForm.style.opacity = "1";
+                        bookingForm.style.pointerEvents = "auto";
+                    }
+                }
+            } catch (e) {}
         }
 
         function renderServices(services) {
@@ -342,7 +402,6 @@
             selectedServiceIds.delete(strId);
             selectedServicesMap.delete(strId);
             
-            // Re-render list & summary to untick the checkbox automatically
             filterServices();
             updateSummary();
         }
@@ -391,8 +450,6 @@
                 }
             }
 
-            container.innerHTML = '<p class="col-span-full text-xs text-gray-400 text-center py-4">Loading slots...</p>';
-
             try {
                 const res = await fetch(`${API_URL}/slots?salon=${salonSlug}&date=${date}`);
                 const slots = await res.json();
@@ -403,8 +460,9 @@
                 }
 
                 container.innerHTML = slots.map(slot => {
-                    if (slot.is_booked) {
-                        return `<div class="bg-red-50 border border-red-100 text-red-600 font-semibold py-2 rounded-xl text-center text-[11px] cursor-not-allowed">${slot.time} (Booked)</div>`;
+                    if (slot.is_booked || !isSalonActive) {
+                        const labelText = !isSalonActive ? 'Closed' : 'Booked';
+                        return `<div class="bg-red-50 border border-red-100 text-red-600 font-semibold py-2 rounded-xl text-center text-[11px] cursor-not-allowed">${slot.time} (${labelText})</div>`;
                     } else {
                         const isSelected = selectedTimeSlot === slot.time ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-200 text-gray-700 hover:bg-indigo-50';
                         return `<button type="button" onclick="selectSlot('${slot.time}')" class="border py-2 rounded-xl text-center text-[11px] font-bold transition ${isSelected}">${slot.time}</button>`;
@@ -413,11 +471,11 @@
 
             } catch (err) {
                 console.error("Error loading slots:", err);
-                container.innerHTML = '<p class="col-span-full text-xs text-red-400 text-center py-4">Failed to load slots.</p>';
             }
         }
 
         function selectSlot(time) {
+            if (!isSalonActive) return;
             selectedTimeSlot = time;
             fetchTimeSlots();
         }
@@ -425,6 +483,11 @@
         async function submitBooking(e) {
             e.preventDefault();
             const t = translations[currentLang];
+
+            if (!isSalonActive) {
+                alert(t.salonPausedMsg);
+                return;
+            }
 
             if (selectedServiceIds.size === 0 || !selectedTimeSlot) {
                 alert(t.selectAtLeastOne);
@@ -578,8 +641,6 @@
 
             doc.save(`Appointment_${lastBookingData.clientName.replace(/\s+/g, '_')}.pdf`);
         }
-
-        loadSalonDetails();
     </script>
 </body>
 </html>

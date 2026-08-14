@@ -138,7 +138,7 @@
     </footer>
 
     <script>
-        const API_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
+        const API_URL = window.location.protocol === "file:" || window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
             ? "http://127.0.0.1:8000" 
             : "https://salon-saas-backend-na9l.onrender.com";
         const urlParams = new URLSearchParams(window.location.search);
@@ -410,6 +410,7 @@
                 });
                 if (res.ok) {
                     alert(t.settingsUpdated);
+                    loadDashboard();
                 } else {
                     alert(t.failedSettings);
                 }

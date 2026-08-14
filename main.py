@@ -310,7 +310,9 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
 
         slots = []
         now = datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
         total_minutes = open_total_minutes
+
         while total_minutes < close_total_minutes:
             hour = (total_minutes // 60) % 24
             minute = total_minutes % 60
@@ -319,7 +321,10 @@ def get_slots(salon_id: str = None, salon: str = None, id: str = None, date: str
 
             if resolved_salon and resolved_salon.is_active is False:
                 is_booked = True
-            elif date == now.strftime("%Y-%m-%d"):
+            elif date < today_str:
+                # Mark all slots as unavailable for past dates
+                is_booked = True
+            elif date == today_str:
                 if hour < now.hour or (hour == now.hour and now.minute > minute):
                     is_booked = True
 
@@ -358,6 +363,13 @@ async def create_appointment(request: Request, db: Session = Depends(get_db)):
     
     if resolved_salon and resolved_salon.is_active is False:
         raise HTTPException(status_code=400, detail="Bookings are currently paused for this salon.")
+
+    # Prevent past date booking
+    app_time = data.get("appointment_time", "")
+    app_date_str = app_time.split("T")[0] if "T" in app_time else app_time.split(" ")[0]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if app_date_str < today_str:
+        raise HTTPException(status_code=400, detail="Cannot book an appointment for a past date.")
 
     new_app = Appointment(
         id=str(uuid.uuid4()),

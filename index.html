@@ -308,8 +308,13 @@
                     });
                 });
 
+                // Set default date to today and prevent selecting past dates in HTML date picker
                 const today = new Date().toISOString().split('T')[0];
-                document.getElementById('appointment-date').value = today;
+                const dateInput = document.getElementById('appointment-date');
+                if (dateInput) {
+                    dateInput.min = today;
+                    dateInput.value = today;
+                }
 
                 filterServices();
                 fetchTimeSlots();
@@ -450,6 +455,12 @@
                 }
             }
 
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (date < todayStr) {
+                container.innerHTML = '<p class="col-span-full text-xs text-red-500 text-center py-4 font-semibold">Cannot select past dates.</p>';
+                return;
+            }
+
             try {
                 const res = await fetch(`${API_URL}/slots?salon=${salonSlug}&date=${date}`);
                 const slots = await res.json();
@@ -505,6 +516,12 @@
                 if (parts.length === 3) {
                     date = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
                 }
+            }
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (date < todayStr) {
+                alert("Cannot book an appointment for a past date.");
+                return;
             }
 
             const appointment_time = `${date}T${selectedTimeSlot}:00`;
